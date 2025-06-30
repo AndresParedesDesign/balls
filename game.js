@@ -1,339 +1,254 @@
-// Game Variables
-let canvas, ctx;
-let gameState = 'welcome'; // welcome, playing, gameOver
-let gameTime = 0;
-let lastTime = 0;
-let bestTime = localStorage.getItem('gameBallsBestTime') || 0;
-let soundEnabled = true;
-
-// Game Objects
-let player;
-let enemies = [];
-let powerUps = [];
-let particles = [];
-
-// Game Settings
+// ===== CONFIGURACIÓN DEL JUEGO =====
 const CANVAS_WIDTH = 800;
 const CANVAS_HEIGHT = 600;
-const PLAYER_SPEED = 5;
-const INITIAL_ENEMY_SPEED = 3; // Increased from 2 to 3
-const ENEMY_SPAWN_INTERVAL = 10000; // 10 seconds
-const SPEED_INCREASE_INTERVAL = 15000; // 15 seconds
-const POWERUP_SPAWN_CHANCE = 0.001; // Reduced spawn chance (was 0.002)
+const PLAYER_SPEED = 4;
+const ENEMY_SPEED = 2.5;
+const ENEMY_SPAWN_TIME = 8000; // 8 segundos
+const SPEED_INCREASE_TIME = 20000; // 20 segundos
 
-// Background Animation
-let backgroundOffset = 0;
-let backgroundRotation = 0;
+// ===== VARIABLES GLOBALES =====
+let canvas, ctx;
+let gameState = 'welcome'; // 'welcome', 'playing', 'gameOver'
+let gameTime = 0;
+let lastEnemySpawn = 0;
+let lastSpeedIncrease = 0;
+let bestScore = localStorage.getItem('bestScore') || 0;
+let currentSpeedMultiplier = 1;
 
-// Input Handling
-const keys = {
-    ArrowUp: false,
-    ArrowDown: false,
-    ArrowLeft: false,
-    ArrowRight: false
-};
+// ===== OBJETOS DEL JUEGO =====
+let player = null;
+let enemies = [];
+let powerUps = [];
 
-// Audio Context for Sound Effects
-let audioContext;
-let soundInitialized = false;
+// ===== CONTROLES =====
+const keys = {};
 
-// Initialize Audio
-function initAudio() {
-    if (!soundInitialized && soundEnabled) {
-        try {
-            audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            soundInitialized = true;
-        } catch (e) {
-            console.log('Audio not supported');
-            soundEnabled = false;
-        }
+// ===== AUDIO =====
+let audioContext = null;
+let soundEnabled = true;
+
+// ===== INICIALIZACIÓN =====
+function init() {
+    canvas = document.getElementById('gameCanvas');
+    ctx = canvas.getContext('2d');
+    
+    // Inicializar audio
+    try {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    } catch (e) {
+        soundEnabled = false;
     }
+    
+    // Mostrar mejor puntuación
+    updateBestScore();
+    
+    // Event listeners
+    setupEventListeners();
 }
 
-// Sound Effects
-function playSound(frequency, duration, type = 'sine') {
-    if (!soundEnabled || !audioContext) return;
-    
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
-    
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
-    
-    oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
-    oscillator.type = type;
-    
-    gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
-    
-    oscillator.start(audioContext.currentTime);
-    oscillator.stop(audioContext.currentTime + duration);
-}
-
-// Particle System
-class Particle {
-    constructor(x, y, color, velocity) {
-        this.x = x;
-        this.y = y;
-        this.color = color;
-        this.velocity = velocity;
-        this.life = 1.0;
-        this.decay = 0.02;
-    }
-    
-    update() {
-        this.x += this.velocity.x;
-        this.y += this.velocity.y;
-        this.velocity.x *= 0.98;
-        this.velocity.y *= 0.98;
-        this.life -= this.decay;
-    }
-    
-    draw() {
-        ctx.save();
-        ctx.globalAlpha = this.life;
-        ctx.fillStyle = this.color;
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, 3, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-    }
-}
-
-// Player Class
+// ===== CLASE JUGADOR =====
 class Player {
-    constructor(x, y) {
-        this.x = x;
-        this.y = y;
+    constructor() {
+        this.x = CANVAS_WIDTH / 2;
+        this.y = CANVAS_HEIGHT / 2;
         this.radius = 15;
-        this.color = '#4ecdc4';
-        this.glowColor = 'rgba(78, 205, 196, 0.3)';
+        this.color = '#4ecdc4'; // Azul
     }
     
     update() {
-        // Movement
-        if (keys.ArrowUp && this.y - this.radius > 0) {
+        // Movimiento con flechas
+        if (keys['ArrowUp'] && this.y - this.radius > 0) {
             this.y -= PLAYER_SPEED;
         }
-        if (keys.ArrowDown && this.y + this.radius < CANVAS_HEIGHT) {
+        if (keys['ArrowDown'] && this.y + this.radius < CANVAS_HEIGHT) {
             this.y += PLAYER_SPEED;
         }
-        if (keys.ArrowLeft && this.x - this.radius > 0) {
+        if (keys['ArrowLeft'] && this.x - this.radius > 0) {
             this.x -= PLAYER_SPEED;
         }
-        if (keys.ArrowRight && this.x + this.radius < CANVAS_WIDTH) {
+        if (keys['ArrowRight'] && this.x + this.radius < CANVAS_WIDTH) {
             this.x += PLAYER_SPEED;
         }
     }
     
     draw() {
-        // Glow effect
         ctx.save();
         ctx.shadowColor = this.color;
-        ctx.shadowBlur = 20;
-        
-        // Main ball
+        ctx.shadowBlur = 15;
         ctx.fillStyle = this.color;
         ctx.beginPath();
         ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
         ctx.fill();
-        
-        // Inner highlight
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-        ctx.beginPath();
-        ctx.arc(this.x - 3, this.y - 3, this.radius * 0.6, 0, Math.PI * 2);
-        ctx.fill();
-        
         ctx.restore();
     }
 }
 
-// Enemy Class
+// ===== CLASE ENEMIGO =====
 class Enemy {
-    constructor(x, y, speed) {
+    constructor(x, y) {
         this.x = x;
         this.y = y;
         this.radius = 12;
-        this.speed = speed;
-        this.color = '#ff6b6b';
-        this.pulsePhase = Math.random() * Math.PI * 2;
+        this.color = '#ff6b6b'; // Rojo
         
-        // Generate random angle for movement direction
+        // Generar velocidad aleatoria
         const angle = Math.random() * Math.PI * 2;
-        this.velocityX = Math.cos(angle) * speed;
-        this.velocityY = Math.sin(angle) * speed;
+        const speed = ENEMY_SPEED * currentSpeedMultiplier;
+        this.vx = Math.cos(angle) * speed;
+        this.vy = Math.sin(angle) * speed;
         
-        // Ensure minimum velocity (avoid very slow movement)
-        const minVelocity = speed * 0.7;
-        if (Math.abs(this.velocityX) < minVelocity) {
-            this.velocityX = this.velocityX >= 0 ? minVelocity : -minVelocity;
+        // Asegurar velocidad mínima
+        if (Math.abs(this.vx) < speed * 0.5) {
+            this.vx = this.vx > 0 ? speed * 0.5 : -speed * 0.5;
         }
-        if (Math.abs(this.velocityY) < minVelocity) {
-            this.velocityY = this.velocityY >= 0 ? minVelocity : -minVelocity;
+        if (Math.abs(this.vy) < speed * 0.5) {
+            this.vy = this.vy > 0 ? speed * 0.5 : -speed * 0.5;
         }
     }
     
     update() {
-        // Move the ball
-        this.x += this.velocityX;
-        this.y += this.velocityY;
+        // Mover
+        this.x += this.vx;
+        this.y += this.vy;
         
-        // Bounce off walls with perfect reflection
-        if (this.x <= this.radius) {
-            this.x = this.radius;
-            this.velocityX = Math.abs(this.velocityX); // Always bounce right
-            playSound(200, 0.1, 'square');
+        // Rebotar en paredes
+        if (this.x <= this.radius || this.x >= CANVAS_WIDTH - this.radius) {
+            this.vx = -this.vx;
+            this.x = this.x <= this.radius ? this.radius : CANVAS_WIDTH - this.radius;
+            playSound(200, 0.1);
         }
-        if (this.x >= CANVAS_WIDTH - this.radius) {
-            this.x = CANVAS_WIDTH - this.radius;
-            this.velocityX = -Math.abs(this.velocityX); // Always bounce left
-            playSound(200, 0.1, 'square');
+        if (this.y <= this.radius || this.y >= CANVAS_HEIGHT - this.radius) {
+            this.vy = -this.vy;
+            this.y = this.y <= this.radius ? this.radius : CANVAS_HEIGHT - this.radius;
+            playSound(200, 0.1);
         }
-        if (this.y <= this.radius) {
-            this.y = this.radius;
-            this.velocityY = Math.abs(this.velocityY); // Always bounce down
-            playSound(200, 0.1, 'square');
-        }
-        if (this.y >= CANVAS_HEIGHT - this.radius) {
-            this.y = CANVAS_HEIGHT - this.radius;
-            this.velocityY = -Math.abs(this.velocityY); // Always bounce up
-            playSound(200, 0.1, 'square');
-        }
-        
-        // Add slight random variation to prevent predictable patterns
-        if (Math.random() < 0.001) { // Very small chance
-            this.velocityX += (Math.random() - 0.5) * 0.1;
-            this.velocityY += (Math.random() - 0.5) * 0.1;
-            
-            // Keep speed consistent
-            const currentSpeed = Math.sqrt(this.velocityX * this.velocityX + this.velocityY * this.velocityY);
-            if (currentSpeed > 0) {
-                this.velocityX = (this.velocityX / currentSpeed) * this.speed;
-                this.velocityY = (this.velocityY / currentSpeed) * this.speed;
-            }
-        }
-        
-        this.pulsePhase += 0.1;
     }
     
     draw() {
-        const pulseSize = Math.sin(this.pulsePhase) * 2;
-        
         ctx.save();
         ctx.shadowColor = this.color;
-        ctx.shadowBlur = 15;
-        
-        // Main ball
+        ctx.shadowBlur = 10;
         ctx.fillStyle = this.color;
         ctx.beginPath();
-        ctx.arc(this.x, this.y, this.radius + pulseSize, 0, Math.PI * 2);
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
         ctx.fill();
-        
-        // Inner highlight
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
-        ctx.beginPath();
-        ctx.arc(this.x - 2, this.y - 2, (this.radius + pulseSize) * 0.5, 0, Math.PI * 2);
-        ctx.fill();
-        
         ctx.restore();
     }
 }
 
-// PowerUp Class
+// ===== CLASE POWER-UP =====
 class PowerUp {
     constructor(x, y, type) {
         this.x = x;
         this.y = y;
-        this.radius = 10;
-        this.type = type; // 'slow', 'destroy'
-        this.lifetime = 10000; // 10 seconds
-        this.pulsePhase = 0;
+        this.radius = 12;
+        this.type = type; // 'slow' o 'destroy'
+        this.lifetime = 15000; // 15 segundos
+        this.age = 0;
         
         if (type === 'slow') {
-            this.color = '#ffd700';
-            this.effect = '⏰';
-        } else if (type === 'destroy') {
-            this.color = '#ff69b4';
-            this.effect = '💥';
+            this.color = '#ffd700'; // Dorado
+            this.symbol = '⏰';
+        } else {
+            this.color = '#ff69b4'; // Rosa
+            this.symbol = '💥';
         }
     }
     
     update(deltaTime) {
-        this.lifetime -= deltaTime;
-        this.pulsePhase += 0.15;
-        return this.lifetime > 0;
+        this.age += deltaTime;
+        return this.age < this.lifetime;
     }
     
     draw() {
-        const pulse = Math.sin(this.pulsePhase) * 3;
+        // Efecto pulsante
+        const pulse = Math.sin(this.age * 0.01) * 2;
         
         ctx.save();
         ctx.shadowColor = this.color;
-        ctx.shadowBlur = 20;
-        
+        ctx.shadowBlur = 15;
         ctx.fillStyle = this.color;
         ctx.beginPath();
         ctx.arc(this.x, this.y, this.radius + pulse, 0, Math.PI * 2);
         ctx.fill();
         
-        // Effect symbol
+        // Símbolo
         ctx.fillStyle = 'white';
         ctx.font = '16px Arial';
         ctx.textAlign = 'center';
-        ctx.fillText(this.effect, this.x, this.y + 5);
-        
+        ctx.fillText(this.symbol, this.x, this.y + 5);
         ctx.restore();
     }
     
     activate() {
         if (this.type === 'slow') {
-            slowTime();
-        } else if (this.type === 'destroy') {
+            slowEnemies();
+        } else {
             destroyRandomEnemy();
         }
-        playSound(800, 0.3, 'sine');
+        playSound(500, 0.3);
     }
 }
 
-// Power-up effects
-function slowTime() {
-    const originalSpeed = PLAYER_SPEED;
+// ===== FUNCIONES DE POWER-UPS =====
+function slowEnemies() {
     enemies.forEach(enemy => {
-        enemy.velocityX *= 0.3;
-        enemy.velocityY *= 0.3;
+        enemy.vx *= 0.5;
+        enemy.vy *= 0.5;
     });
     
+    // Restaurar velocidad después de 5 segundos
     setTimeout(() => {
         enemies.forEach(enemy => {
-            enemy.velocityX /= 0.3;
-            enemy.velocityY /= 0.3;
+            enemy.vx *= 2;
+            enemy.vy *= 2;
         });
-    }, 3000);
+    }, 5000);
 }
 
 function destroyRandomEnemy() {
-    if (enemies.length > 1) {
+    if (enemies.length > 0) {
         const randomIndex = Math.floor(Math.random() * enemies.length);
-        const enemy = enemies[randomIndex];
-        
-        // Create explosion particles
-        for (let i = 0; i < 10; i++) {
-            particles.push(new Particle(
-                enemy.x,
-                enemy.y,
-                '#ff6b6b',
-                {
-                    x: (Math.random() - 0.5) * 8,
-                    y: (Math.random() - 0.5) * 8
-                }
-            ));
-        }
-        
         enemies.splice(randomIndex, 1);
     }
 }
 
-// Collision Detection
+// ===== FUNCIONES DE SPAWNING =====
+function spawnEnemy() {
+    const side = Math.floor(Math.random() * 4);
+    let x, y;
+    
+    switch (side) {
+        case 0: // Arriba
+            x = Math.random() * CANVAS_WIDTH;
+            y = -20;
+            break;
+        case 1: // Derecha
+            x = CANVAS_WIDTH + 20;
+            y = Math.random() * CANVAS_HEIGHT;
+            break;
+        case 2: // Abajo
+            x = Math.random() * CANVAS_WIDTH;
+            y = CANVAS_HEIGHT + 20;
+            break;
+        case 3: // Izquierda
+            x = -20;
+            y = Math.random() * CANVAS_HEIGHT;
+            break;
+    }
+    
+    enemies.push(new Enemy(x, y));
+}
+
+function spawnPowerUp() {
+    const x = Math.random() * (CANVAS_WIDTH - 50) + 25;
+    const y = Math.random() * (CANVAS_HEIGHT - 50) + 25;
+    const type = Math.random() < 0.5 ? 'slow' : 'destroy';
+    
+    powerUps.push(new PowerUp(x, y, type));
+}
+
+// ===== DETECCIÓN DE COLISIONES =====
 function checkCollision(obj1, obj2) {
     const dx = obj1.x - obj2.x;
     const dy = obj1.y - obj2.y;
@@ -341,170 +256,77 @@ function checkCollision(obj1, obj2) {
     return distance < obj1.radius + obj2.radius;
 }
 
-// Game Functions
-function initGame() {
-    canvas = document.getElementById('gameCanvas');
-    ctx = canvas.getContext('2d');
-    
-    // Initialize player
-    player = new Player(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
-    
-    // Initialize first enemy inside the canvas with random movement
-    enemies = [];
-    let firstEnemyX = Math.random() * (CANVAS_WIDTH - 200) + 100;
-    let firstEnemyY = Math.random() * (CANVAS_HEIGHT - 200) + 100;
-    // Make sure first enemy doesn't spawn too close to player
-    while (Math.abs(firstEnemyX - player.x) < 100 && Math.abs(firstEnemyY - player.y) < 100) {
-        firstEnemyX = Math.random() * (CANVAS_WIDTH - 200) + 100;
-        firstEnemyY = Math.random() * (CANVAS_HEIGHT - 200) + 100;
-    }
-    enemies.push(new Enemy(firstEnemyX, firstEnemyY, INITIAL_ENEMY_SPEED));
-    
-    // Clear arrays
-    powerUps = [];
-    particles = [];
-    
-    // Reset game time
+// ===== FUNCIONES DE JUEGO =====
+function startGame() {
+    gameState = 'playing';
     gameTime = 0;
-    lastTime = 0;
+    lastEnemySpawn = 0;
+    lastSpeedIncrease = 0;
+    currentSpeedMultiplier = 1;
     
-    // Update UI
-    updateBestScore();
+    // Reiniciar objetos
+    player = new Player();
+    enemies = [];
+    powerUps = [];
     
-    // Start game loop
+    // Spawn primer enemigo
+    spawnEnemy();
+    
+    // Mostrar pantalla de juego
+    showScreen('gameScreen');
+    
+    // Iniciar loop
     gameLoop();
-}
-
-function spawnEnemy() {
-    let x, y;
-    const side = Math.floor(Math.random() * 4);
-    const currentSpeed = INITIAL_ENEMY_SPEED + Math.floor(gameTime / SPEED_INCREASE_INTERVAL) * 0.5;
-    
-    // Spawn enemies from random edge of screen
-    switch (side) {
-        case 0: // Top
-            x = Math.random() * (CANVAS_WIDTH - 100) + 50;
-            y = 20;
-            break;
-        case 1: // Right
-            x = CANVAS_WIDTH - 20;
-            y = Math.random() * (CANVAS_HEIGHT - 100) + 50;
-            break;
-        case 2: // Bottom
-            x = Math.random() * (CANVAS_WIDTH - 100) + 50;
-            y = CANVAS_HEIGHT - 20;
-            break;
-        case 3: // Left
-            x = 20;
-            y = Math.random() * (CANVAS_HEIGHT - 100) + 50;
-            break;
-    }
-    
-    enemies.push(new Enemy(x, y, currentSpeed));
-}
-
-function spawnPowerUp() {
-    const types = ['slow', 'destroy'];
-    const type = types[Math.floor(Math.random() * types.length)];
-    const x = Math.random() * (CANVAS_WIDTH - 40) + 20;
-    const y = Math.random() * (CANVAS_HEIGHT - 40) + 20;
-    
-    powerUps.push(new PowerUp(x, y, type));
-}
-
-function updateBackground() {
-    backgroundOffset += 0.5;
-    backgroundRotation += 0.001;
-}
-
-function drawBackground() {
-    ctx.save();
-    
-    // Animated gradient background
-    const gradient = ctx.createLinearGradient(
-        Math.sin(backgroundRotation) * 400 + 400, 
-        Math.cos(backgroundRotation) * 300 + 300, 
-        -Math.sin(backgroundRotation) * 400 + 400, 
-        -Math.cos(backgroundRotation) * 300 + 300
-    );
-    gradient.addColorStop(0, '#1e3c72');
-    gradient.addColorStop(0.5, '#2a5298');
-    gradient.addColorStop(1, '#1e3c72');
-    
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-    
-    // Moving background pattern
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
-    ctx.lineWidth = 1;
-    
-    for (let i = 0; i < 20; i++) {
-        const x = (i * 50 + backgroundOffset) % (CANVAS_WIDTH + 50);
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, CANVAS_HEIGHT);
-        ctx.stroke();
-        
-        const y = (i * 50 + backgroundOffset) % (CANVAS_HEIGHT + 50);
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(CANVAS_WIDTH, y);
-        ctx.stroke();
-    }
-    
-    ctx.restore();
 }
 
 function gameLoop() {
     if (gameState !== 'playing') return;
     
     const currentTime = Date.now();
-    const deltaTime = currentTime - lastTime;
-    lastTime = currentTime;
-    
+    const deltaTime = 16; // ~60 FPS
     gameTime += deltaTime;
     
-    // Update background
-    updateBackground();
+    // Limpiar canvas
+    ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
     
-    // Clear canvas
+    // Fondo
     drawBackground();
     
-    // Update player
+    // Actualizar jugador
     player.update();
     
-    // Update enemies
+    // Actualizar enemigos
     enemies.forEach(enemy => enemy.update());
     
-    // Update power-ups
+    // Actualizar power-ups
     powerUps = powerUps.filter(powerUp => powerUp.update(deltaTime));
     
-    // Update particles
-    particles = particles.filter(particle => {
-        particle.update();
-        return particle.life > 0;
-    });
-    
-    // Spawn new enemies
-    if (gameTime % ENEMY_SPAWN_INTERVAL < deltaTime) {
+    // Spawn enemigos
+    if (gameTime - lastEnemySpawn > ENEMY_SPAWN_TIME) {
         spawnEnemy();
-        playSound(300, 0.2, 'sawtooth');
+        lastEnemySpawn = gameTime;
     }
     
-    // Spawn power-ups randomly
-    if (Math.random() < POWERUP_SPAWN_CHANCE) {
+    // Aumentar velocidad
+    if (gameTime - lastSpeedIncrease > SPEED_INCREASE_TIME) {
+        currentSpeedMultiplier += 0.2;
+        lastSpeedIncrease = gameTime;
+    }
+    
+    // Spawn power-ups (probabilidad baja)
+    if (Math.random() < 0.001) {
         spawnPowerUp();
     }
     
-    // Check collisions with enemies
+    // Colisiones con enemigos
     for (let enemy of enemies) {
         if (checkCollision(player, enemy)) {
-            gameOver();
+            endGame();
             return;
         }
     }
     
-    // Check collisions with power-ups
+    // Colisiones con power-ups
     for (let i = powerUps.length - 1; i >= 0; i--) {
         if (checkCollision(player, powerUps[i])) {
             powerUps[i].activate();
@@ -512,69 +334,47 @@ function gameLoop() {
         }
     }
     
-    // Draw particles
-    particles.forEach(particle => particle.draw());
-    
-    // Draw power-ups
+    // Dibujar todo
+    player.draw();
+    enemies.forEach(enemy => enemy.draw());
     powerUps.forEach(powerUp => powerUp.draw());
     
-    // Draw enemies
-    enemies.forEach(enemy => enemy.draw());
-    
-    // Draw player
-    player.draw();
-    
-    // Update UI
+    // Actualizar UI
     updateGameUI();
     
+    // Continuar loop
     requestAnimationFrame(gameLoop);
 }
 
-function gameOver() {
+function endGame() {
     gameState = 'gameOver';
+    const finalScore = Math.floor(gameTime / 1000);
     
-    // Explosion effect
-    for (let i = 0; i < 20; i++) {
-        particles.push(new Particle(
-            player.x,
-            player.y,
-            '#4ecdc4',
-            {
-                x: (Math.random() - 0.5) * 10,
-                y: (Math.random() - 0.5) * 10
-            }
-        ));
-    }
-    
-    playSound(150, 1, 'sawtooth');
-    
-    const finalTime = Math.floor(gameTime / 1000);
-    document.getElementById('finalTime').textContent = `Tiempo sobrevivido: ${finalTime}s`;
-    
-    // Check for new record
-    if (finalTime > bestTime) {
-        bestTime = finalTime;
-        localStorage.setItem('gameBallsBestTime', bestTime);
+    // Verificar mejor puntuación
+    if (finalScore > bestScore) {
+        bestScore = finalScore;
+        localStorage.setItem('bestScore', bestScore);
         document.getElementById('newRecord').classList.remove('hidden');
-        playSound(600, 0.5, 'sine');
     } else {
         document.getElementById('newRecord').classList.add('hidden');
     }
     
+    document.getElementById('finalTime').textContent = `Tiempo sobrevivido: ${finalScore}s`;
     showScreen('gameOverScreen');
+    
+    playSound(150, 1);
 }
 
+// ===== FUNCIONES DE UI =====
 function updateGameUI() {
     const seconds = Math.floor(gameTime / 1000);
     document.getElementById('timer').textContent = `Tiempo: ${seconds}s`;
     document.getElementById('enemyCount').textContent = `Enemigos: ${enemies.length}`;
-    
-    const speedMultiplier = (1 + Math.floor(gameTime / SPEED_INCREASE_INTERVAL) * 0.25).toFixed(1);
-    document.getElementById('speed').textContent = `Velocidad: ${speedMultiplier}x`;
+    document.getElementById('speed').textContent = `Velocidad: ${currentSpeedMultiplier.toFixed(1)}x`;
 }
 
 function updateBestScore() {
-    document.getElementById('bestScore').textContent = `Mejor Tiempo: ${bestTime}s`;
+    document.getElementById('bestScore').textContent = `Mejor Tiempo: ${bestScore}s`;
 }
 
 function showScreen(screenId) {
@@ -584,65 +384,62 @@ function showScreen(screenId) {
     document.getElementById(screenId).classList.remove('hidden');
 }
 
-// Event Listeners
-document.addEventListener('DOMContentLoaded', () => {
-    updateBestScore();
+function drawBackground() {
+    const gradient = ctx.createLinearGradient(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    gradient.addColorStop(0, '#1e3c72');
+    gradient.addColorStop(1, '#2a5298');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+}
+
+// ===== SONIDO =====
+function playSound(frequency, duration) {
+    if (!soundEnabled || !audioContext) return;
     
-    document.getElementById('startButton').addEventListener('click', () => {
-        initAudio();
-        gameState = 'playing';
-        showScreen('gameScreen');
-        initGame();
-        playSound(400, 0.3, 'sine');
-    });
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
     
-    document.getElementById('restartButton').addEventListener('click', () => {
-        gameState = 'playing';
-        showScreen('gameScreen');
-        initGame();
-        playSound(400, 0.3, 'sine');
-    });
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
     
+    oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
+    oscillator.type = 'sine';
+    
+    gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
+    
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + duration);
+}
+
+// ===== EVENT LISTENERS =====
+function setupEventListeners() {
+    // Botones
+    document.getElementById('startButton').addEventListener('click', startGame);
+    document.getElementById('restartButton').addEventListener('click', startGame);
     document.getElementById('homeButton').addEventListener('click', () => {
         gameState = 'welcome';
         showScreen('welcomeScreen');
-        playSound(300, 0.2, 'sine');
     });
     
+    // Sonido
     document.getElementById('soundToggle').addEventListener('click', () => {
         soundEnabled = !soundEnabled;
         document.getElementById('soundToggle').textContent = `Sonido: ${soundEnabled ? 'ON' : 'OFF'}`;
-        
-        if (soundEnabled) {
-            initAudio();
+    });
+    
+    // Teclado
+    document.addEventListener('keydown', (e) => {
+        keys[e.code] = true;
+        if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
+            e.preventDefault();
         }
     });
-});
-
-// Keyboard Controls
-document.addEventListener('keydown', (e) => {
-    if (e.code in keys) {
-        keys[e.code] = true;
-        e.preventDefault();
-    }
-});
-
-document.addEventListener('keyup', (e) => {
-    if (e.code in keys) {
+    
+    document.addEventListener('keyup', (e) => {
         keys[e.code] = false;
-        e.preventDefault();
-    }
-});
+    });
+}
 
-// Prevent scrolling with arrow keys
-window.addEventListener('keydown', (e) => {
-    if(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
-        e.preventDefault();
-    }
-});
-
-// Initialize canvas context when page loads
-document.addEventListener('DOMContentLoaded', () => {
-    canvas = document.getElementById('gameCanvas');
-    ctx = canvas.getContext('2d');
-}); 
+// ===== INICIALIZACIÓN =====
+document.addEventListener('DOMContentLoaded', init); 

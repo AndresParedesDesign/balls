@@ -19,6 +19,11 @@ let currentSpeedMultiplier = 1;
 let player = null;
 let enemies = [];
 let powerUps = [];
+let slowPowerUpsCount = 0; // Contador de power-ups de ralentización acumulados
+
+// ===== POSICIÓN DEL MOUSE =====
+let mouseX = CANVAS_WIDTH / 2;
+let mouseY = CANVAS_HEIGHT / 2;
 
 // ===== CONTROLES =====
 const keys = {};
@@ -53,22 +58,17 @@ class Player {
         this.y = CANVAS_HEIGHT / 2;
         this.radius = 15;
         this.color = '#4ecdc4'; // Azul
+        this.smoothing = 0.1; // Factor de suavizado para el movimiento
     }
     
     update() {
-        // Movimiento con flechas
-        if (keys['ArrowUp'] && this.y - this.radius > 0) {
-            this.y -= PLAYER_SPEED;
-        }
-        if (keys['ArrowDown'] && this.y + this.radius < CANVAS_HEIGHT) {
-            this.y += PLAYER_SPEED;
-        }
-        if (keys['ArrowLeft'] && this.x - this.radius > 0) {
-            this.x -= PLAYER_SPEED;
-        }
-        if (keys['ArrowRight'] && this.x + this.radius < CANVAS_WIDTH) {
-            this.x += PLAYER_SPEED;
-        }
+        // Movimiento suave hacia la posición del cursor
+        const targetX = Math.max(this.radius, Math.min(CANVAS_WIDTH - this.radius, mouseX));
+        const targetY = Math.max(this.radius, Math.min(CANVAS_HEIGHT - this.radius, mouseY));
+        
+        // Interpolación suave hacia el objetivo
+        this.x += (targetX - this.x) * this.smoothing;
+        this.y += (targetY - this.y) * this.smoothing;
     }
     
     draw() {
@@ -182,28 +182,40 @@ class PowerUp {
     
     activate() {
         if (this.type === 'slow') {
-            slowEnemies();
+            // Acumular power-up de ralentización
+            slowPowerUpsCount++;
+            playSound(400, 0.2);
         } else {
+            // Activar inmediatamente power-up de destrucción
             destroyRandomEnemy();
+            playSound(500, 0.3);
         }
-        playSound(500, 0.3);
     }
 }
 
 // ===== FUNCIONES DE POWER-UPS =====
-function slowEnemies() {
-    enemies.forEach(enemy => {
-        enemy.vx *= 0.5;
-        enemy.vy *= 0.5;
-    });
-    
-    // Restaurar velocidad después de 5 segundos
-    setTimeout(() => {
+function activateSlowPowerUp() {
+    if (slowPowerUpsCount > 0) {
+        slowPowerUpsCount--;
+        
         enemies.forEach(enemy => {
-            enemy.vx *= 2;
-            enemy.vy *= 2;
+            enemy.vx *= 0.5;
+            enemy.vy *= 0.5;
         });
-    }, 5000);
+        
+        playSound(600, 0.4);
+        
+        // Restaurar velocidad después de 5 segundos
+        setTimeout(() => {
+            enemies.forEach(enemy => {
+                enemy.vx *= 2;
+                enemy.vy *= 2;
+            });
+        }, 5000);
+        
+        return true;
+    }
+    return false;
 }
 
 function destroyRandomEnemy() {
@@ -263,6 +275,7 @@ function startGame() {
     lastEnemySpawn = 0;
     lastSpeedIncrease = 0;
     currentSpeedMultiplier = 1;
+    slowPowerUpsCount = 0; // Reiniciar contador de power-ups
     
     // Reiniciar objetos
     player = new Player();
@@ -371,6 +384,12 @@ function updateGameUI() {
     document.getElementById('timer').textContent = `Tiempo: ${seconds}s`;
     document.getElementById('enemyCount').textContent = `Enemigos: ${enemies.length}`;
     document.getElementById('speed').textContent = `Velocidad: ${currentSpeedMultiplier.toFixed(1)}x`;
+    
+    // Actualizar contador de power-ups (buscar elemento, si no existe lo ignoramos)
+    const powerUpCounter = document.getElementById('powerUpCounter');
+    if (powerUpCounter) {
+        powerUpCounter.textContent = `Power-ups ⏰: ${slowPowerUpsCount}`;
+    }
 }
 
 function updateBestScore() {
@@ -428,16 +447,19 @@ function setupEventListeners() {
         document.getElementById('soundToggle').textContent = `Sonido: ${soundEnabled ? 'ON' : 'OFF'}`;
     });
     
-    // Teclado
-    document.addEventListener('keydown', (e) => {
-        keys[e.code] = true;
-        if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
-            e.preventDefault();
-        }
+    // Movimiento del mouse
+    canvas.addEventListener('mousemove', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        mouseX = e.clientX - rect.left;
+        mouseY = e.clientY - rect.top;
     });
     
-    document.addEventListener('keyup', (e) => {
-        keys[e.code] = false;
+    // Teclado para activar power-ups
+    document.addEventListener('keydown', (e) => {
+        if (e.code === 'KeyR' && gameState === 'playing') {
+            activateSlowPowerUp();
+            e.preventDefault();
+        }
     });
 }
 

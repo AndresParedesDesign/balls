@@ -1,0 +1,223 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Arial', sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+}
+
+#gameContainer {
+    position: relative;
+    width: 900px;
+    height: 700px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(10px);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.screen {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 40px;
+    text-align: center;
+    color: white;
+    transition: all 0.5s ease;
+}
+
+.hidden {
+    opacity: 0;
+    pointer-events: none;
+    transform: scale(0.8);
+}
+
+#welcomeScreen h1 {
+    font-size: 4rem;
+    margin-bottom: 30px;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+    animation: pulse 2s infinite;
+}
+
+#welcomeScreen p {
+    font-size: 1.2rem;
+    margin-bottom: 10px;
+    opacity: 0.9;
+}
+
+.btn {
+    background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+    color: white;
+    border: none;
+    padding: 15px 30px;
+    font-size: 1.2rem;
+    border-radius: 50px;
+    cursor: pointer;
+    margin: 10px;
+    transition: all 0.3s ease;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    text-transform: uppercase;
+    font-weight: bold;
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+    background: linear-gradient(45deg, #ee5a24, #ff6b6b);
+}
+
+.btn:active {
+    transform: translateY(0);
+}
+
+#bestScore {
+    margin-top: 30px;
+    font-size: 1.5rem;
+    color: #ffd700;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+#gameScreen {
+    padding: 20px;
+}
+
+#gameUI {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.5);
+    padding: 15px 30px;
+    border-radius: 50px;
+    margin-bottom: 20px;
+    backdrop-filter: blur(5px);
+}
+
+#gameUI div {
+    color: white;
+    font-size: 1.2rem;
+    font-weight: bold;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+#timer {
+    color: #4ecdc4;
+}
+
+#enemyCount {
+    color: #ff6b6b;
+}
+
+#speed {
+    color: #ffd700;
+}
+
+#gameCanvas {
+    border: 3px solid rgba(255, 255, 255, 0.3);
+    border-radius: 15px;
+    background: linear-gradient(45deg, #1e3c72, #2a5298);
+    box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.3);
+    display: block;
+    margin: 0 auto;
+}
+
+#gameOverScreen h1 {
+    font-size: 3rem;
+    color: #ff6b6b;
+    margin-bottom: 30px;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+    animation: shake 0.5s;
+}
+
+#finalTime {
+    font-size: 2rem;
+    margin-bottom: 20px;
+    color: #4ecdc4;
+}
+
+#newRecord {
+    font-size: 1.5rem;
+    color: #ffd700;
+    margin-bottom: 20px;
+    animation: glow 1s infinite alternate;
+}
+
+#controls {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 0.9rem;
+}
+
+#controls p {
+    margin: 5px 0;
+}
+
+#soundToggle {
+    cursor: pointer;
+    color: #ffd700;
+    font-weight: bold;
+}
+
+#soundToggle:hover {
+    text-shadow: 0 0 5px #ffd700;
+}
+
+/* Animations */
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
+}
+
+@keyframes glow {
+    0% { text-shadow: 0 0 5px #ffd700; }
+    100% { text-shadow: 0 0 20px #ffd700, 0 0 30px #ffd700; }
+}
+
+/* Responsive design */
+@media (max-width: 950px) {
+    #gameContainer {
+        width: 95vw;
+        height: 90vh;
+    }
+    
+    #gameCanvas {
+        width: 100%;
+        height: auto;
+        max-width: 800px;
+        max-height: 600px;
+    }
+    
+    #welcomeScreen h1 {
+        font-size: 2.5rem;
+    }
+    
+    .btn {
+        font-size: 1rem;
+        padding: 12px 24px;
+    }
+} 

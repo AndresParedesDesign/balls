@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GameBalls - Juego de Evasión</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="gameContainer">
+        <!-- Pantalla de bienvenida -->
+        <div id="welcomeScreen" class="screen">
+            <h1>🎮 GameBalls</h1>
+            <p>Controla la bola azul con las flechas del teclado</p>
+            <p>Evita las bolas rojas enemigas</p>
+            <p>¡Sobrevive el mayor tiempo posible!</p>
+            <button id="startButton" class="btn">Comenzar Juego</button>
+            <div id="bestScore">Mejor Tiempo: 0s</div>
+        </div>
+
+        <!-- Pantalla de juego -->
+        <div id="gameScreen" class="screen hidden">
+            <div id="gameUI">
+                <div id="timer">Tiempo: 0s</div>
+                <div id="enemyCount">Enemigos: 1</div>
+                <div id="speed">Velocidad: 1x</div>
+            </div>
+            <canvas id="gameCanvas" width="800" height="600"></canvas>
+        </div>
+
+        <!-- Pantalla de Game Over -->
+        <div id="gameOverScreen" class="screen hidden">
+            <h1>¡Game Over!</h1>
+            <div id="finalTime">Tiempo sobrevivido: 0s</div>
+            <div id="newRecord" class="hidden">¡Nuevo récord!</div>
+            <button id="restartButton" class="btn">Jugar de Nuevo</button>
+            <button id="homeButton" class="btn">Menú Principal</button>
+        </div>
+
+        <!-- Controles (siempre visibles durante el juego) -->
+        <div id="controls">
+            <p>🎮 Usa las flechas del teclado para moverte</p>
+            <p>🔊 <span id="soundToggle">Sonido: ON</span></p>
+        </div>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+</html> 

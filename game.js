@@ -16,10 +16,10 @@ let particles = [];
 const CANVAS_WIDTH = 800;
 const CANVAS_HEIGHT = 600;
 const PLAYER_SPEED = 5;
-const INITIAL_ENEMY_SPEED = 2;
+const INITIAL_ENEMY_SPEED = 3; // Increased from 2 to 3
 const ENEMY_SPAWN_INTERVAL = 10000; // 10 seconds
 const SPEED_INCREASE_INTERVAL = 15000; // 15 seconds
-const POWERUP_SPAWN_CHANCE = 0.002; // Chance per frame
+const POWERUP_SPAWN_CHANCE = 0.001; // Reduced spawn chance (was 0.002)
 
 // Background Animation
 let backgroundOffset = 0;
@@ -150,7 +150,7 @@ class Player {
 
 // Enemy Class
 class Enemy {
-    constructor(x, y, speed, targetX = null, targetY = null) {
+    constructor(x, y, speed) {
         this.x = x;
         this.y = y;
         this.radius = 12;
@@ -158,55 +158,59 @@ class Enemy {
         this.color = '#ff6b6b';
         this.pulsePhase = Math.random() * Math.PI * 2;
         
-        // If target is provided (for spawning from edges), move towards it
-        if (targetX !== null && targetY !== null) {
-            const dx = targetX - x;
-            const dy = targetY - y;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            this.velocityX = (dx / distance) * speed;
-            this.velocityY = (dy / distance) * speed;
-        } else {
-            // Random movement with minimum speed
-            let vx = (Math.random() - 0.5) * speed * 2;
-            let vy = (Math.random() - 0.5) * speed * 2;
-            
-            // Ensure minimum speed
-            if (Math.abs(vx) < speed * 0.5) {
-                vx = vx >= 0 ? speed * 0.5 : -speed * 0.5;
-            }
-            if (Math.abs(vy) < speed * 0.5) {
-                vy = vy >= 0 ? speed * 0.5 : -speed * 0.5;
-            }
-            
-            this.velocityX = vx;
-            this.velocityY = vy;
+        // Generate random angle for movement direction
+        const angle = Math.random() * Math.PI * 2;
+        this.velocityX = Math.cos(angle) * speed;
+        this.velocityY = Math.sin(angle) * speed;
+        
+        // Ensure minimum velocity (avoid very slow movement)
+        const minVelocity = speed * 0.7;
+        if (Math.abs(this.velocityX) < minVelocity) {
+            this.velocityX = this.velocityX >= 0 ? minVelocity : -minVelocity;
+        }
+        if (Math.abs(this.velocityY) < minVelocity) {
+            this.velocityY = this.velocityY >= 0 ? minVelocity : -minVelocity;
         }
     }
     
     update() {
+        // Move the ball
         this.x += this.velocityX;
         this.y += this.velocityY;
         
-        // Bounce off walls
-        if (this.x - this.radius <= 0) {
-            this.velocityX = Math.abs(this.velocityX); // Ensure positive velocity
+        // Bounce off walls with perfect reflection
+        if (this.x <= this.radius) {
             this.x = this.radius;
+            this.velocityX = Math.abs(this.velocityX); // Always bounce right
             playSound(200, 0.1, 'square');
         }
-        if (this.x + this.radius >= CANVAS_WIDTH) {
-            this.velocityX = -Math.abs(this.velocityX); // Ensure negative velocity
+        if (this.x >= CANVAS_WIDTH - this.radius) {
             this.x = CANVAS_WIDTH - this.radius;
+            this.velocityX = -Math.abs(this.velocityX); // Always bounce left
             playSound(200, 0.1, 'square');
         }
-        if (this.y - this.radius <= 0) {
-            this.velocityY = Math.abs(this.velocityY); // Ensure positive velocity
+        if (this.y <= this.radius) {
             this.y = this.radius;
+            this.velocityY = Math.abs(this.velocityY); // Always bounce down
             playSound(200, 0.1, 'square');
         }
-        if (this.y + this.radius >= CANVAS_HEIGHT) {
-            this.velocityY = -Math.abs(this.velocityY); // Ensure negative velocity
+        if (this.y >= CANVAS_HEIGHT - this.radius) {
             this.y = CANVAS_HEIGHT - this.radius;
+            this.velocityY = -Math.abs(this.velocityY); // Always bounce up
             playSound(200, 0.1, 'square');
+        }
+        
+        // Add slight random variation to prevent predictable patterns
+        if (Math.random() < 0.001) { // Very small chance
+            this.velocityX += (Math.random() - 0.5) * 0.1;
+            this.velocityY += (Math.random() - 0.5) * 0.1;
+            
+            // Keep speed consistent
+            const currentSpeed = Math.sqrt(this.velocityX * this.velocityX + this.velocityY * this.velocityY);
+            if (currentSpeed > 0) {
+                this.velocityX = (this.velocityX / currentSpeed) * this.speed;
+                this.velocityY = (this.velocityY / currentSpeed) * this.speed;
+            }
         }
         
         this.pulsePhase += 0.1;
@@ -372,34 +376,31 @@ function initGame() {
 }
 
 function spawnEnemy() {
-    let x, y, targetX, targetY;
+    let x, y;
     const side = Math.floor(Math.random() * 4);
     const currentSpeed = INITIAL_ENEMY_SPEED + Math.floor(gameTime / SPEED_INCREASE_INTERVAL) * 0.5;
     
-    // Generate random target point inside the canvas
-    targetX = Math.random() * (CANVAS_WIDTH - 100) + 50;
-    targetY = Math.random() * (CANVAS_HEIGHT - 100) + 50;
-    
+    // Spawn enemies from random edge of screen
     switch (side) {
         case 0: // Top
-            x = Math.random() * CANVAS_WIDTH;
-            y = -20;
+            x = Math.random() * (CANVAS_WIDTH - 100) + 50;
+            y = 20;
             break;
         case 1: // Right
-            x = CANVAS_WIDTH + 20;
-            y = Math.random() * CANVAS_HEIGHT;
+            x = CANVAS_WIDTH - 20;
+            y = Math.random() * (CANVAS_HEIGHT - 100) + 50;
             break;
         case 2: // Bottom
-            x = Math.random() * CANVAS_WIDTH;
-            y = CANVAS_HEIGHT + 20;
+            x = Math.random() * (CANVAS_WIDTH - 100) + 50;
+            y = CANVAS_HEIGHT - 20;
             break;
         case 3: // Left
-            x = -20;
-            y = Math.random() * CANVAS_HEIGHT;
+            x = 20;
+            y = Math.random() * (CANVAS_HEIGHT - 100) + 50;
             break;
     }
     
-    enemies.push(new Enemy(x, y, currentSpeed, targetX, targetY));
+    enemies.push(new Enemy(x, y, currentSpeed));
 }
 
 function spawnPowerUp() {

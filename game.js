@@ -150,15 +150,37 @@ class Player {
 
 // Enemy Class
 class Enemy {
-    constructor(x, y, speed) {
+    constructor(x, y, speed, targetX = null, targetY = null) {
         this.x = x;
         this.y = y;
         this.radius = 12;
         this.speed = speed;
         this.color = '#ff6b6b';
-        this.velocityX = (Math.random() - 0.5) * this.speed;
-        this.velocityY = (Math.random() - 0.5) * this.speed;
         this.pulsePhase = Math.random() * Math.PI * 2;
+        
+        // If target is provided (for spawning from edges), move towards it
+        if (targetX !== null && targetY !== null) {
+            const dx = targetX - x;
+            const dy = targetY - y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            this.velocityX = (dx / distance) * speed;
+            this.velocityY = (dy / distance) * speed;
+        } else {
+            // Random movement with minimum speed
+            let vx = (Math.random() - 0.5) * speed * 2;
+            let vy = (Math.random() - 0.5) * speed * 2;
+            
+            // Ensure minimum speed
+            if (Math.abs(vx) < speed * 0.5) {
+                vx = vx >= 0 ? speed * 0.5 : -speed * 0.5;
+            }
+            if (Math.abs(vy) < speed * 0.5) {
+                vy = vy >= 0 ? speed * 0.5 : -speed * 0.5;
+            }
+            
+            this.velocityX = vx;
+            this.velocityY = vy;
+        }
     }
     
     update() {
@@ -166,14 +188,24 @@ class Enemy {
         this.y += this.velocityY;
         
         // Bounce off walls
-        if (this.x - this.radius <= 0 || this.x + this.radius >= CANVAS_WIDTH) {
-            this.velocityX = -this.velocityX;
-            this.x = Math.max(this.radius, Math.min(CANVAS_WIDTH - this.radius, this.x));
+        if (this.x - this.radius <= 0) {
+            this.velocityX = Math.abs(this.velocityX); // Ensure positive velocity
+            this.x = this.radius;
             playSound(200, 0.1, 'square');
         }
-        if (this.y - this.radius <= 0 || this.y + this.radius >= CANVAS_HEIGHT) {
-            this.velocityY = -this.velocityY;
-            this.y = Math.max(this.radius, Math.min(CANVAS_HEIGHT - this.radius, this.y));
+        if (this.x + this.radius >= CANVAS_WIDTH) {
+            this.velocityX = -Math.abs(this.velocityX); // Ensure negative velocity
+            this.x = CANVAS_WIDTH - this.radius;
+            playSound(200, 0.1, 'square');
+        }
+        if (this.y - this.radius <= 0) {
+            this.velocityY = Math.abs(this.velocityY); // Ensure positive velocity
+            this.y = this.radius;
+            playSound(200, 0.1, 'square');
+        }
+        if (this.y + this.radius >= CANVAS_HEIGHT) {
+            this.velocityY = -Math.abs(this.velocityY); // Ensure negative velocity
+            this.y = CANVAS_HEIGHT - this.radius;
             playSound(200, 0.1, 'square');
         }
         
@@ -313,9 +345,16 @@ function initGame() {
     // Initialize player
     player = new Player(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
     
-    // Initialize first enemy
+    // Initialize first enemy inside the canvas with random movement
     enemies = [];
-    spawnEnemy();
+    let firstEnemyX = Math.random() * (CANVAS_WIDTH - 200) + 100;
+    let firstEnemyY = Math.random() * (CANVAS_HEIGHT - 200) + 100;
+    // Make sure first enemy doesn't spawn too close to player
+    while (Math.abs(firstEnemyX - player.x) < 100 && Math.abs(firstEnemyY - player.y) < 100) {
+        firstEnemyX = Math.random() * (CANVAS_WIDTH - 200) + 100;
+        firstEnemyY = Math.random() * (CANVAS_HEIGHT - 200) + 100;
+    }
+    enemies.push(new Enemy(firstEnemyX, firstEnemyY, INITIAL_ENEMY_SPEED));
     
     // Clear arrays
     powerUps = [];
@@ -333,9 +372,13 @@ function initGame() {
 }
 
 function spawnEnemy() {
-    let x, y;
+    let x, y, targetX, targetY;
     const side = Math.floor(Math.random() * 4);
     const currentSpeed = INITIAL_ENEMY_SPEED + Math.floor(gameTime / SPEED_INCREASE_INTERVAL) * 0.5;
+    
+    // Generate random target point inside the canvas
+    targetX = Math.random() * (CANVAS_WIDTH - 100) + 50;
+    targetY = Math.random() * (CANVAS_HEIGHT - 100) + 50;
     
     switch (side) {
         case 0: // Top
@@ -356,7 +399,7 @@ function spawnEnemy() {
             break;
     }
     
-    enemies.push(new Enemy(x, y, currentSpeed));
+    enemies.push(new Enemy(x, y, currentSpeed, targetX, targetY));
 }
 
 function spawnPowerUp() {
